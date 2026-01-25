@@ -1,0 +1,37 @@
+# Core Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Database
+sqlalchemy==2.0.25
+alembic==1.13.1
+
+# CORS & Security
+python-multipart==0.0.6
+
+# Environment
+python-dotenv==1.0.0
+
+# HTTP Client (for API integrations)
+httpx==0.26.0
+
+# Task Queue (for async job processing)
+celery==5.3.6
+redis==5.0.1
+
+# Video Generation APIs (placeholder - will add specific SDKs)
+# runway-sdk - when available
+# pika-api-client - when available
+
+# Platform APIs
+# tiktok-business-api - TBD
+# instagram-graph-api - TBD
+
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.3
+
+# Logging & Monitoring
+structlog==24.1.0
