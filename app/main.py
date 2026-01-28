@@ -1,64 +1,78 @@
 """
-StarDance Platform v2.0 - Multi-Agent Architecture
+Stardance Platform - Main FastAPI Application
+
+Phase 2.1: Video Generation Agent
+- Accepts SBOX parameters
+- Generates video generation instructions
+- Ready for Runway integration (Phase 2.2)
 """
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.config import settings
+from fastapi.responses import JSONResponse
+import logging
+
+from app.agents.video_generation.routes import router as video_router
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
-    title=settings.APP_TITLE,
-    description=settings.APP_DESCRIPTION,
-    version=settings.APP_VERSION,
-    debug=settings.DEBUG,
+    title="Stardance Video Generation API",
+    description="Phase 2.1: Video Generation Agent - Convert SBOX parameters to Runway prompts",
+    version="2.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
 )
 
-# CORS Middleware
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Health & Status Endpoints
-@app.get("/")
+# Include routers
+app.include_router(video_router)
+
+# Root endpoint
+@app.get("/", tags=["health"])
 async def root():
+    """Root endpoint - API info."""
     return {
-        "service": "StarDance Platform v2.0",
-        "version": settings.APP_VERSION,
-        "environment": settings.ENVIRONMENT,
-        "status": "healthy",
-        "phase_2_features": {
-            "video_generation": settings.ENABLE_VIDEO_GENERATION,
-            "distribution": settings.ENABLE_DISTRIBUTION,
-            "attribution": settings.ENABLE_ATTRIBUTION,
-            "learning": settings.ENABLE_LEARNING,
-            "regeneration": settings.ENABLE_REGENERATION,
-        },
-        "message": "Multi-agent platform - Phase 2 development"
-    }
-
-@app.get("/health")
-async def health():
-    return {
-        "status": "healthy",
-        "version": settings.APP_VERSION,
-        "environment": settings.ENVIRONMENT
-    }
-
-# Agent Status Endpoint
-@app.get("/agents/status")
-async def agents_status():
-    return {
-        "agents": {
-            "cim": "ready",
-            "sbox": "ready",
-            "video_generation": "building" if settings.ENABLE_VIDEO_GENERATION else "disabled",
-            "distribution": "building" if settings.ENABLE_DISTRIBUTION else "disabled",
-            "attribution": "building" if settings.ENABLE_ATTRIBUTION else "disabled",
-            "learning": "building" if settings.ENABLE_LEARNING else "disabled",
-            "regeneration": "building" if settings.ENABLE_REGENERATION else "disabled",
+        "name": "Stardance Video Generation API",
+        "version": "2.0.0",
+        "phase": "2.1 - Video Generation Agent",
+        "status": "operational",
+        "docs": "/docs",
+        "endpoints": {
+            "translate": "POST /agents/video/translate",
+            "status": "GET /agents/status",
+            "health": "GET /agents/video/health"
         }
     }
+
+# Health check endpoint
+@app.get("/health", tags=["health"])
+async def health():
+    """General health check."""
+    return {"status": "healthy", "service": "stardance-video-generation"}
+
+# Error handlers
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    """Global exception handler."""
+    logger.error(f"Unhandled exception: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"}
+    )
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
