@@ -1,78 +1,129 @@
 """
-Stardance Platform - Main FastAPI Application
-
-Phase 2.1: Video Generation Agent
-- Accepts SBOX parameters
-- Generates video generation instructions
-- Ready for Runway integration (Phase 2.2)
+main.py
+Stardance V2 - A2 System Underwriting Integration
+Production FastAPI Application
 """
+import os
+import sys
+import logging
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import logging
-
-from app.agents.video_generation.routes import router as video_router
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
+# A2 System Underwriting Integration
+from app.a2_system_underwriting.a2_underwriting_router import router as a2_router
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan events"""
+    logger.info("🚀 Stardance V2 Starting up...")
+    logger.info("✅ A2 System Underwriting Module Loaded")
+    yield
+    logger.info("🛑 Shutting down...")
+
+# Initialize FastAPI
 app = FastAPI(
-    title="Stardance Video Generation API",
-    description="Phase 2.1: Video Generation Agent - Convert SBOX parameters to Runway prompts",
-    version="2.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    title="Stardance V2 - Brand Intelligence API",
+    description="9MD Analysis + A2 System Underwriting + Asset Orchestration",
+    version="2.2.0",
+    lifespan=lifespan
 )
 
-# Configure CORS
+# CORS Configuration
+# Adjust origins based on your frontend deployments
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "https://9md-frontend.vercel.app",
+    "https://sbox-motion-frontend.vercel.app",
+    "https://stardance.studio",
+    # Add your specific Vercel deployment URLs
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(video_router)
+# Include A2 System Underwriting Router
+app.include_router(a2_router)
+logger.info("🔒 A2 Underwriting Router mounted at /v1/a2")
 
-# Root endpoint
-@app.get("/", tags=["health"])
+@app.get("/", tags=["Health"])
 async def root():
-    """Root endpoint - API info."""
+    """Root health endpoint"""
     return {
-        "name": "Stardance Video Generation API",
-        "version": "2.0.0",
-        "phase": "2.1 - Video Generation Agent",
+        "service": "Stardance V2 API",
         "status": "operational",
-        "docs": "/docs",
-        "endpoints": {
-            "translate": "POST /agents/video/translate",
-            "status": "GET /agents/status",
-            "health": "GET /agents/video/health"
+        "version": "2.2.0",
+        "modules": [
+            "9md_analysis",
+            "a2_underwriting",
+            "asset_orchestration"
+        ],
+        "docs": "/docs"
+    }
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    """Comprehensive health check"""
+    return {
+        "status": "healthy",
+        "timestamp": __import__('datetime').datetime.utcnow().isoformat(),
+        "services": {
+            "api": "ok",
+            "a2_underwriting": "loaded"
         }
     }
 
-# Health check endpoint
-@app.get("/health", tags=["health"])
-async def health():
-    """General health check."""
-    return {"status": "healthy", "service": "stardance-video-generation"}
+@app.get("/v1/a2", tags=["A2 System Underwriting"])
+async def a2_info():
+    """A2 System Underwriting module info"""
+    return {
+        "module": "A2 System Underwriting",
+        "version": "1.1.0-PTC-FINAL",
+        "endpoints": [
+            {
+                "path": "/v1/a2/underwrite",
+                "method": "POST",
+                "description": "Submit brand for PLA system underwriting"
+            },
+            {
+                "path": "/v1/a2/health",
+                "method": "GET", 
+                "description": "A2 module health check"
+            }
+        ],
+        "capabilities": [
+            "SystemFitAggregation",
+            "TransitionPenaltyCheck",
+            "ConfidenceCalculation (PTC)",
+            "DecisionEngine",
+            "CalibrationTracking"
+        ]
+    }
 
 # Error handlers
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
-    """Global exception handler."""
-    logger.error(f"Unhandled exception: {exc}")
+    logger.error(f"Global error: {str(exc)}")
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"}
+        content={"detail": "Internal server error", "type": "global_error"}
     )
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
