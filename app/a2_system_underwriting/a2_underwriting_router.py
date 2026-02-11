@@ -1,5 +1,5 @@
 """
-a2_underwriting_router.py - Production with Debug Logging
+a2_underwriting_router.py - Production Fix
 """
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
@@ -77,39 +77,30 @@ async def underwrite_pla_system(request: A2UnderwritingRequest):
     logger.info(f"Processing underwriting for brand: {request.brand_id}")
     
     try:
-        # Step 1: Extract profiles
-        logger.debug("Step 1: Extracting profiles")
+        # Extract profiles
         image_9pd = request.stage_profiles.image.model_dump()
         video_9pd = request.stage_profiles.video.model_dump()
         lp_9pd = request.stage_profiles.landing_page.model_dump()
-        logger.debug("Profiles extracted successfully")
         
-        # Step 2: Check penalties
-        logger.debug("Step 2: Checking penalties")
+        # Check penalties
         penalties = penalty_checker.check_penalties(image_9pd, video_9pd, lp_9pd)
-        logger.debug(f"Penalties: {penalties}")
         
-        # Step 3: Calculate system fit
-        logger.debug("Step 3: Calculating system fit")
+        # Calculate system fit
         fit_result = aggregator.aggregate(
             image_fit=request.stage_fits.get('image', 0.0),
             video_fit=request.stage_fits.get('video', 0.0),
             landing_page_fit=request.stage_fits.get('landing_page', 0.0),
             transition_penalty_sum=penalties['transition_penalty_sum']
         )
-        logger.debug(f"Fit result: {fit_result}")
         
-        # Step 4: Aggregate profile
+        # Aggregate profile
         aggregated_profile = {k: (image_9pd.get(k, 0.5) + video_9pd.get(k, 0.5) + lp_9pd.get(k, 0.5)) / 3 
                              for k in image_9pd.keys()}
-        logger.debug(f"Aggregated profile keys: {list(aggregated_profile.keys())}")
         
-        # Step 5: Handle data support
+        # Handle data support
         data_support = request.data_support if request.data_support else DataSupportInput()
-        logger.debug(f"Data support: similarity={data_support.similarity}, sample_count={data_support.sample_count}")
         
-        # Step 6: Calculate confidence
-        logger.debug("Step 6: Calculating confidence")
+        # Calculate confidence
         confidence_result = confidence_calculator.calculate(
             stage_confidences=request.stage_confidences,
             data_support={'similarity': data_support.similarity, 'sample_count': data_support.sample_count},
@@ -118,33 +109,30 @@ async def underwrite_pla_system(request: A2UnderwritingRequest):
             measurement_quality=request.measurement_quality
         )
         system_confidence = confidence_result['system_confidence']
-        logger.debug(f"System confidence: {system_confidence}")
         
-        # Step 7: Make decision
-        logger.debug("Step 7: Making decision")
+        # Make decision
         decision_result = decision_engine.make_decision(
             system_fit=fit_result['system_fit'],
             system_confidence=system_confidence,
             transition_penalty_sum=penalties['transition_penalty_sum'],
             stage_gates_passed=request.stage_gates_passed
         )
-        logger.debug(f"Decision: {decision_result['decision']}")
         
-        # Step 8: Track calibration
-        logger.debug("Step 8: Tracking calibration")
+        # Handle missing rationale gracefully
+        rationale = decision_result.get('rationale', [f"Decision: {decision_result.get('decision', 'UNKNOWN')}"])
+        
+        # Track calibration
         cal_event = calibration_tracker.track_evaluation(
             sector_id=request.sector,
             pla_system_sequence="image_video_landing_page",
             system_confidence=system_confidence
         )
-        logger.debug(f"Calibration event: {cal_event}")
         
-        # Build response
-        logger.info(f"Underwriting complete for {request.brand_id}: {decision_result['decision']}")
+        logger.info(f"Underwriting complete for {request.brand_id}: {decision_result.get('decision')}")
         
         return A2UnderwritingResponse(
             brand_id=request.brand_id,
-            decision=decision_result['decision'],
+            decision=decision_result.get('decision', 'ERROR'),
             system_fit=fit_result['system_fit'],
             system_fit_raw=fit_result['system_fit_raw'],
             system_confidence=system_confidence,
@@ -158,7 +146,7 @@ async def underwrite_pla_system(request: A2UnderwritingRequest):
             ),
             transition_penalty_sum=penalties['transition_penalty_sum'],
             triggered_penalties=penalties['triggered_penalties'],
-            decision_rationale=decision_result['rationale'],
+            decision_rationale=rationale,
             calibration_event_id=cal_event.get('event_id') if cal_event else None
         )
         
