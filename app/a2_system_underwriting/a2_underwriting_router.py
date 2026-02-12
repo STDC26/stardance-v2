@@ -1,5 +1,5 @@
 """
-a2_underwriting_router.py - Production Fix
+a2_underwriting_router.py - Production Fix v2
 """
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
@@ -72,6 +72,15 @@ decision_engine = SystemDecisionEngine()
 calibration_tracker = CalibrationTracker()
 confidence_calculator = SystemConfidenceCalculator()
 
+def safe_get_event_id(cal_event):
+    """Safely extract event_id from either dict or object"""
+    if cal_event is None:
+        return None
+    if isinstance(cal_event, dict):
+        return cal_event.get('event_id')
+    # Handle object with attribute
+    return getattr(cal_event, 'event_id', None)
+
 @router.post("/underwrite", response_model=A2UnderwritingResponse)
 async def underwrite_pla_system(request: A2UnderwritingRequest):
     logger.info(f"Processing underwriting for brand: {request.brand_id}")
@@ -128,6 +137,9 @@ async def underwrite_pla_system(request: A2UnderwritingRequest):
             system_confidence=system_confidence
         )
         
+        # Safely extract event_id
+        cal_event_id = safe_get_event_id(cal_event)
+        
         logger.info(f"Underwriting complete for {request.brand_id}: {decision_result.get('decision')}")
         
         return A2UnderwritingResponse(
@@ -147,7 +159,7 @@ async def underwrite_pla_system(request: A2UnderwritingRequest):
             transition_penalty_sum=penalties['transition_penalty_sum'],
             triggered_penalties=penalties['triggered_penalties'],
             decision_rationale=rationale,
-            calibration_event_id=cal_event.get('event_id') if cal_event else None
+            calibration_event_id=cal_event_id
         )
         
     except Exception as e:
