@@ -1,5 +1,5 @@
 """
-a2_underwriting_router.py - Production Fix v2
+a2_underwriting_router.py - Production Fix v3
 """
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
@@ -73,13 +73,35 @@ calibration_tracker = CalibrationTracker()
 confidence_calculator = SystemConfidenceCalculator()
 
 def safe_get_event_id(cal_event):
-    """Safely extract event_id from either dict or object"""
+    """Safely extract event_id from object, dict, or UUID"""
     if cal_event is None:
         return None
     if isinstance(cal_event, dict):
-        return cal_event.get('event_id')
-    # Handle object with attribute
-    return getattr(cal_event, 'event_id', None)
+        event_id = cal_event.get('event_id')
+    else:
+        event_id = getattr(cal_event, 'event_id', None)
+    
+    # Convert UUID to string if needed
+    if event_id is not None:
+        return str(event_id)
+    return None
+
+def extract_penalty_names(penalties_list):
+    """Convert PenaltyResult objects or dicts to penalty name strings"""
+    if not penalties_list:
+        return []
+    
+    result = []
+    for p in penalties_list:
+        if isinstance(p, str):
+            result.append(p)
+        elif isinstance(p, dict):
+            result.append(p.get('penalty_name', p.get('id', 'unknown')))
+        else:
+            # Object - try common attributes
+            name = getattr(p, 'penalty_name', None) or getattr(p, 'id', None) or getattr(p, 'name', 'unknown')
+            result.append(str(name))
+    return result
 
 @router.post("/underwrite", response_model=A2UnderwritingResponse)
 async def underwrite_pla_system(request: A2UnderwritingRequest):
@@ -137,8 +159,11 @@ async def underwrite_pla_system(request: A2UnderwritingRequest):
             system_confidence=system_confidence
         )
         
-        # Safely extract event_id
+        # Safely extract event_id and convert to string
         cal_event_id = safe_get_event_id(cal_event)
+        
+        # Extract penalty names as strings
+        penalty_names = extract_penalty_names(penalties.get('triggered_penalties', []))
         
         logger.info(f"Underwriting complete for {request.brand_id}: {decision_result.get('decision')}")
         
@@ -157,7 +182,7 @@ async def underwrite_pla_system(request: A2UnderwritingRequest):
                 final_confidence=system_confidence
             ),
             transition_penalty_sum=penalties['transition_penalty_sum'],
-            triggered_penalties=penalties['triggered_penalties'],
+            triggered_penalties=penalty_names,
             decision_rationale=rationale,
             calibration_event_id=cal_event_id
         )
