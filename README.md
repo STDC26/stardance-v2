@@ -40,3 +40,4 @@ pytest tests/
 ## Architecture Docs
 
 See `/docs` folder for detailed architecture diagrams and agent specifications.
+# T5 Deploy Thu Feb 12 18:54:26 MST 2026
