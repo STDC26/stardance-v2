@@ -7,6 +7,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 from app.a2_system_underwriting.a2_underwriting_router import router as a2_router
+from app.api.routes.hub_routes import router as hub_router
 
 app = FastAPI(title="Stardance V2", version="2.2.0")
 
@@ -19,6 +20,9 @@ app.add_middleware(
 
 app.include_router(a2_router)
 logger.info("🔒 A2 Router mounted at /v1/a2")
+
+app.include_router(hub_router)
+logger.info("🔗 Hub Router mounted at /v1/hub")
 
 @app.get("/")
 async def root():
