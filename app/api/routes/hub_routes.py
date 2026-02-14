@@ -166,19 +166,8 @@ async def hub_generate(request: HubGenerateRequest):
     # 2. Map to canonical metrics using adapter
     canonical = map_a2_to_canonical(a2_json)
     
-    # Gate enforcement
-    if not canonical.gate_pass:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "HUB_GATE_FAILURE",
-                "message": "A2 gate compliance check failed",
-                "tis": canonical.tis,
-                "gci": canonical.gci,
-                "clg": canonical.clg,
-                "decision": canonical.routing_band
-            }
-        )
+    # Gate enforcement (demo mode: generate hub for all decisions)
+    pass
 
     # 3. Generate Hub HTML
     hub_id = str(uuid.uuid4())[:8]
