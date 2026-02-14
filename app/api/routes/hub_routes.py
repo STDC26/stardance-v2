@@ -140,10 +140,11 @@ async def hub_generate(request: HubGenerateRequest):
     try:
         from app.a2_system_underwriting.a2_underwriting_router import underwrite_pla_system, A2UnderwritingRequest, StageProfiles, NinePDProfile
         def make_profile(p):
+            d = p if isinstance(p, dict) else p.dict()
             return NinePDProfile(
-                presence=p.presence, trust=p.trust, authenticity=p.authenticity,
-                momentum=p.momentum, taste=p.taste, empathy=p.empathy,
-                autonomy=p.autonomy, resonance=p.resonance, ethics=p.ethics
+                presence=d['presence'], trust=d['trust'], authenticity=d['authenticity'],
+                momentum=d['momentum'], taste=d['taste'], empathy=d['empathy'],
+                autonomy=d['autonomy'], resonance=d['resonance'], ethics=d['ethics']
             )
         sp = request.stage_profiles
         a2_request = A2UnderwritingRequest(
