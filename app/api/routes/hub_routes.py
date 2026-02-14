@@ -15,7 +15,7 @@ from app.t5.a2_schema_adapter import map_a2_to_canonical, UnderwritingResult
 router = APIRouter(prefix="/v1", tags=["hub"])
 
 # External A2 endpoint (validated service)
-A2_UNDERWRITE_URL = "https://stardance-a2-underwriting-production.up.railway.app/v1/a2/underwrite"
+A2_UNDERWRITE_URL = "http://localhost:8080/v1/a2/underwrite"
 
 # R2 Client
 def get_r2_client():
