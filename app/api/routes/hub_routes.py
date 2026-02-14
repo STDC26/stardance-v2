@@ -50,6 +50,10 @@ class HubGenerateRequest(BaseModel):
     product_description: str = Field(...)
     price: str = Field(...)
     offer_hook: str = Field(...)
+    stage_profiles: Dict[str, StageProfile] = Field(default={"image": {"presence":0.85,"trust":0.75,"authenticity":0.75,"momentum":0.60,"taste":0.75,"empathy":0.65,"autonomy":0.70,"resonance":0.72,"vitality":0.68,"ethics":0.80},"video": {"presence":0.75,"trust":0.80,"authenticity":0.78,"momentum":0.70,"taste":0.75,"empathy":0.70,"autonomy":0.72,"resonance":0.80,"vitality":0.72,"ethics":0.80},"landing_page": {"presence":0.65,"trust":0.85,"authenticity":0.80,"momentum":0.55,"taste":0.75,"empathy":0.72,"autonomy":0.75,"resonance":0.72,"vitality":0.69,"ethics":0.82}})
+    stage_fits: Dict[str, float] = Field(default={"image":0.85,"video":0.84,"landing_page":0.87})
+    stage_confidences: Dict[str, float] = Field(default={"image":0.91,"video":0.88,"landing_page":0.91})
+    stage_gates_passed: Dict[str, bool] = Field(default={"image":True,"video":True,"landing_page":True})
     stage_profiles: Dict[str, StageProfile]
     stage_fits: Dict[str, float]
     stage_confidences: Dict[str, float]
