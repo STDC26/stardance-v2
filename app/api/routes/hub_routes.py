@@ -136,34 +136,34 @@ async def hub_generate(request: HubGenerateRequest):
     """
     T5 Hub Generation — External A2 + R2 Deployment
     """
-    # 1. Call External A2 Underwriting
+    # 1. Call A2 Underwriting directly (same service, no HTTP)
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            a2_payload = {
-                "brand_id": request.brand_id,
-                "stage_profiles": {
-                    k: v.dict() for k, v in request.stage_profiles.items()
-                },
-                "stage_fits": request.stage_fits,
-                "stage_confidences": request.stage_confidences,
-                "stage_gates_passed": request.stage_gates_passed
-            }
-            
-            a2_resp = await client.post(A2_UNDERWRITE_URL, json=a2_payload)
-            a2_resp.raise_for_status()
-    except httpx.HTTPStatusError as e:
-        raise HTTPException(
-            status_code=e.response.status_code,
-            detail=f"A2 underwrite failed: {e.response.text}"
+        from app.a2_system_underwriting.a2_underwriting_router import underwrite_pla_system, A2UnderwritingRequest, StageProfiles, NinePDProfile
+        def make_profile(p):
+            return NinePDProfile(
+                presence=p.presence, trust=p.trust, authenticity=p.authenticity,
+                momentum=p.momentum, taste=p.taste, empathy=p.empathy,
+                autonomy=p.autonomy, resonance=p.resonance, ethics=p.ethics
+            )
+        sp = request.stage_profiles
+        a2_request = A2UnderwritingRequest(
+            brand_id=request.brand_id,
+            stage_profiles=StageProfiles(
+                image=make_profile(sp["image"]),
+                video=make_profile(sp["video"]),
+                landing_page=make_profile(sp["landing_page"])
+            ),
+            stage_fits=request.stage_fits,
+            stage_confidences=request.stage_confidences,
+            stage_gates_passed=request.stage_gates_passed
         )
-    except httpx.RequestError as e:
-        raise HTTPException(
-            status_code=503,
-            detail=f"A2 underwriting unavailable: {str(e)}"
-        )
+        a2_result = await underwrite_pla_system(a2_request)
+        a2_json = a2_result.dict() if hasattr(a2_result, "dict") else a2_result
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"A2 underwriting failed: {str(e)}")
 
     # 2. Map to canonical metrics using adapter
-    canonical = map_a2_to_canonical(a2_resp.json())
+    canonical = map_a2_to_canonical(a2_json)
     
     # Gate enforcement
     if not canonical.gate_pass:
