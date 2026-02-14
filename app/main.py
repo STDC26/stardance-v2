@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 from app.a2_system_underwriting.a2_underwriting_router import router as a2_router
 from app.api.routes.hub_routes import router as hub_router
+from app.api.routes.asset_routes import router as asset_router
 
 app = FastAPI(title="Stardance V2", version="2.2.0")
 
@@ -19,6 +20,8 @@ app.add_middleware(
 )
 
 app.include_router(a2_router)
+app.include_router(asset_router)
+logger.info("📊 Asset Scorer mounted at /v1/asset")
 logger.info("🔒 A2 Router mounted at /v1/a2")
 
 app.include_router(hub_router)

@@ -1,0 +1,12 @@
+{
+  "asset_id": "fixture_beauty_lifestyle_warm",
+  "asset_type": "image",
+  "color_temperature": "warm",
+  "text_density": 0.10,
+  "visual_complexity": 0.40,
+  "cta_present": false,
+  "face_present": true,
+  "product_visible": true,
+  "background_style": "lifestyle",
+  "saturation": 0.65
+}

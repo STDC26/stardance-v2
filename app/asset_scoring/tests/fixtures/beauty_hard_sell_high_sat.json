@@ -1,0 +1,12 @@
+{
+  "asset_id": "fixture_beauty_hard_sell",
+  "asset_type": "image",
+  "color_temperature": "warm",
+  "text_density": 0.40,
+  "visual_complexity": 0.65,
+  "cta_present": true,
+  "face_present": false,
+  "product_visible": true,
+  "background_style": "abstract",
+  "saturation": 0.90
+}

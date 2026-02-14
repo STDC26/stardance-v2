@@ -1,0 +1,12 @@
+{
+  "asset_id": "fixture_beauty_clean_clinical",
+  "asset_type": "image",
+  "color_temperature": "cool",
+  "text_density": 0.20,
+  "visual_complexity": 0.30,
+  "cta_present": false,
+  "face_present": false,
+  "product_visible": true,
+  "background_style": "clean",
+  "saturation": 0.60
+}
