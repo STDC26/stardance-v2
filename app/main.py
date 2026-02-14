@@ -42,3 +42,26 @@ if __name__ == "__main__":
     host = "0.0.0.0"
     logger.info(f"🚀 Starting server on {host}:{port}")
     uvicorn.run(app, host=host, port=port)
+
+@app.on_event("startup")
+async def run_migrations():
+    """Idempotent — safe to run on every startup."""
+    import os
+    from sqlalchemy import create_engine, text
+    database_url = os.environ.get("DATABASE_URL")
+    if not database_url:
+        logger.warning("DATABASE_URL not set — skipping migrations")
+        return
+    try:
+        engine = create_engine(database_url)
+        with engine.connect() as conn:
+            conn.execute(text("""
+                ALTER TABLE calibrations 
+                  ADD COLUMN IF NOT EXISTS asset_id VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS asset_scoring_json JSONB,
+                  ADD COLUMN IF NOT EXISTS asset_scoring_version VARCHAR(50)
+            """))
+            conn.commit()
+        logger.info("✅ Migrations complete — asset scoring columns confirmed")
+    except Exception as e:
+        logger.warning(f"Migration warning (non-blocking): {e}")
