@@ -40,7 +40,6 @@ class StageProfile(BaseModel):
     empathy: float
     autonomy: float
     resonance: float
-    vitality: float
     ethics: float
 
 class HubGenerateRequest(BaseModel):

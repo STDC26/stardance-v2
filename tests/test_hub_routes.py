@@ -18,9 +18,9 @@ BASE_PAYLOAD = {
     "price": "$89",
     "offer_hook": "Clinically proven results in 21 days or your money back",
     "stage_profiles": {
-        "image": {"presence": 0.95, "trust": 0.95, "authenticity": 0.95, "momentum": 0.95, "taste": 0.95, "empathy": 0.95, "autonomy": 0.95, "resonance": 0.95, "vitality": 0.95, "ethics": 0.95},
-        "video": {"presence": 0.95, "trust": 0.95, "authenticity": 0.95, "momentum": 0.95, "taste": 0.95, "empathy": 0.95, "autonomy": 0.95, "resonance": 0.95, "vitality": 0.95, "ethics": 0.95},
-        "landing_page": {"presence": 0.95, "trust": 0.95, "authenticity": 0.95, "momentum": 0.95, "taste": 0.95, "empathy": 0.95, "autonomy": 0.95, "resonance": 0.95, "vitality": 0.95, "ethics": 0.95}
+        "image": {"presence": 0.95, "trust": 0.95, "authenticity": 0.95, "momentum": 0.95, "taste": 0.95, "empathy": 0.95, "autonomy": 0.95, "resonance": 0.95, "ethics": 0.95},
+        "video": {"presence": 0.95, "trust": 0.95, "authenticity": 0.95, "momentum": 0.95, "taste": 0.95, "empathy": 0.95, "autonomy": 0.95, "resonance": 0.95, "ethics": 0.95},
+        "landing_page": {"presence": 0.95, "trust": 0.95, "authenticity": 0.95, "momentum": 0.95, "taste": 0.95, "empathy": 0.95, "autonomy": 0.95, "resonance": 0.95, "ethics": 0.95}
     },
     "stage_fits": {"image": 0.95, "video": 0.95, "landing_page": 0.95},
     "stage_confidences": {"image": 0.98, "video": 0.98, "landing_page": 0.98},
