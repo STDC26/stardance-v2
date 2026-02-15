@@ -1,23 +1,27 @@
 """
-T5 Conversion Interface — Phase 2.4 LIVE (DTC Updated)
-Hub routes with External A2 Integration + R2 Deployment
+T5 Conversion Interface — Phase 2.5A LIVE
+Hub routes with Asset Scorer Integration (Gate 5 Deferred)
 """
 import os
+import asyncio
 import httpx
 import boto3
 import uuid
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import Dict
+from typing import Dict, Optional
 
-from app.t5.a2_schema_adapter import map_a2_to_canonical, UnderwritingResult
+from app.t5.a2_schema_adapter import map_a2_to_canonical
+from app.asset_scoring.asset_schema import AssetProperties
+from app.asset_scoring.asset_scorer import AssetScorer
 
 router = APIRouter(prefix="/v1", tags=["hub"])
 
-# External A2 endpoint (validated service)
-A2_UNDERWRITE_URL = "http://localhost:8080/v1/a2/underwrite"
+A2_UNDERWRITE_URL = "https://stardance-a2-underwriting-production.up.railway.app/v1/a2/underwrite"
+ASSET_SCORER_TIMEOUT = 0.75
 
-# R2 Client
+asset_scorer = AssetScorer()
+
 def get_r2_client():
     return boto3.client(
         's3',
@@ -50,14 +54,11 @@ class HubGenerateRequest(BaseModel):
     product_description: str = Field(...)
     price: str = Field(...)
     offer_hook: str = Field(...)
-    stage_profiles: Dict[str, StageProfile] = Field(default={"image": {"presence":0.85,"trust":0.75,"authenticity":0.75,"momentum":0.60,"taste":0.75,"empathy":0.65,"autonomy":0.70,"resonance":0.72,"vitality":0.68,"ethics":0.80},"video": {"presence":0.75,"trust":0.80,"authenticity":0.78,"momentum":0.70,"taste":0.75,"empathy":0.70,"autonomy":0.72,"resonance":0.80,"vitality":0.72,"ethics":0.80},"landing_page": {"presence":0.65,"trust":0.85,"authenticity":0.80,"momentum":0.55,"taste":0.75,"empathy":0.72,"autonomy":0.75,"resonance":0.72,"vitality":0.69,"ethics":0.82}})
-    stage_fits: Dict[str, float] = Field(default={"image":0.85,"video":0.84,"landing_page":0.87})
-    stage_confidences: Dict[str, float] = Field(default={"image":0.91,"video":0.88,"landing_page":0.91})
-    stage_gates_passed: Dict[str, bool] = Field(default={"image":True,"video":True,"landing_page":True})
     stage_profiles: Dict[str, StageProfile]
     stage_fits: Dict[str, float]
     stage_confidences: Dict[str, float]
     stage_gates_passed: Dict[str, bool]
+    asset_properties: Optional[AssetProperties] = None
 
 class HubGenerateResponse(BaseModel):
     hub_id: str
@@ -68,9 +69,15 @@ class HubGenerateResponse(BaseModel):
     routing_band: str
     gate_pass: bool
     status: str
+    asset_scoring: Optional[dict] = None
 
-def generate_hub_html(request: HubGenerateRequest, result: UnderwritingResult, hub_id: str) -> str:
-    """Generate Hub HTML with TIS/GCI embedded."""
+def generate_hub_html(request, result, hub_id, asset_score=None):
+    asset_script = ""
+    if asset_score:
+        import json
+        asset_json_str = json.dumps(asset_score)
+        asset_script = f'<script id="asset-scoring" type="application/json">{asset_json_str}</script>'
+    
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -80,6 +87,7 @@ def generate_hub_html(request: HubGenerateRequest, result: UnderwritingResult, h
     <meta name="tis_score" content="{result.tis}">
     <meta name="gci_score" content="{result.gci}">
     <meta name="decision" content="{result.routing_band}">
+    {asset_script}
     <style>
         body {{ font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background: #fafafa; color: #333; }}
         .container {{ background: white; padding: 40px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
@@ -100,30 +108,22 @@ def generate_hub_html(request: HubGenerateRequest, result: UnderwritingResult, h
             <div class="price">{request.price}</div>
             <p>{request.product_description}</p>
         </div>
-        
-        <div class="decision">
-            {result.routing_band}
-        </div>
-        
+        <div class="decision">{result.routing_band}</div>
         <div class="metric">
             <span class="metric-label">Transition Integrity Score (TIS)</span>
             <span class="metric-value">{result.tis:.4f}</span>
         </div>
-        
         <div class="metric">
             <span class="metric-label">Gate Compliance Index (GCI)</span>
             <span class="metric-value">{result.gci:.4f}</span>
         </div>
-        
         <div class="metric">
             <span class="metric-label">Conversion Likelihood (CLG)</span>
             <span class="metric-value">{result.clg:.4f}</span>
         </div>
-        
         <div class="offer">
             <strong>Special Offer:</strong> {request.offer_hook}
         </div>
-        
         <p style="margin-top: 40px; color: #999; font-size: 12px;">
             Hub ID: {hub_id} | Calibration: {result.calibration_event_id or 'N/A'}
         </p>
@@ -131,62 +131,85 @@ def generate_hub_html(request: HubGenerateRequest, result: UnderwritingResult, h
 </body>
 </html>"""
 
+@router.get("/hub/health")
+async def hub_health():
+    try:
+        s3 = get_r2_client()
+        s3.head_bucket(Bucket=os.getenv('R2_BUCKET_NAME'))
+        r2_status = "connected"
+    except Exception as e:
+        r2_status = f"error: {str(e)}"
+    
+    return {
+        "status": "healthy",
+        "phase": "2.5A",
+        "t5": "active",
+        "a2_integration": "external",
+        "r2_storage": r2_status,
+        "asset_scoring": "enabled"
+    }
+
 @router.post("/hub/generate", response_model=HubGenerateResponse)
 async def hub_generate(request: HubGenerateRequest):
-    """
-    T5 Hub Generation — External A2 + R2 Deployment
-    """
-    # 1. Call A2 Underwriting directly (same service, no HTTP)
-    try:
-        from app.a2_system_underwriting.a2_underwriting_router import underwrite_pla_system, A2UnderwritingRequest, StageProfiles, NinePDProfile
-        def make_profile(p):
-            d = p if isinstance(p, dict) else p.dict()
-            return NinePDProfile(
-                presence=d['presence'], trust=d['trust'], authenticity=d['authenticity'],
-                momentum=d['momentum'], taste=d['taste'], empathy=d['empathy'],
-                autonomy=d['autonomy'], resonance=d['resonance'], ethics=d['ethics']
-            )
-        sp = request.stage_profiles
-        a2_request = A2UnderwritingRequest(
-            brand_id=request.brand_id,
-            stage_profiles=StageProfiles(
-                image=make_profile(sp["image"]),
-                video=make_profile(sp["video"]),
-                landing_page=make_profile(sp["landing_page"])
-            ),
-            stage_fits=request.stage_fits,
-            stage_confidences=request.stage_confidences,
-            stage_gates_passed=request.stage_gates_passed
-        )
-        a2_result = await underwrite_pla_system(a2_request)
-        a2_json = a2_result.dict() if hasattr(a2_result, "dict") else a2_result
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"A2 underwriting failed: {str(e)}")
-
-    # 2. Map to canonical metrics using adapter
-    canonical = map_a2_to_canonical(a2_json)
+    asset_score_result = None
     
-    # Gate enforcement (demo mode: generate hub for all decisions)
-    pass
+    if request.asset_properties:
+        try:
+            asset_score_result = await asyncio.wait_for(
+                asyncio.to_thread(asset_scorer.score, request.asset_properties),
+                timeout=ASSET_SCORER_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            asset_score_result = None
+        except Exception:
+            asset_score_result = None
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            a2_payload = {
+                "brand_id": request.brand_id,
+                "stage_profiles": {k: v.dict() for k, v in request.stage_profiles.items()},
+                "stage_fits": request.stage_fits,
+                "stage_confidences": request.stage_confidences,
+                "stage_gates_passed": request.stage_gates_passed
+            }
+            a2_resp = await client.post(A2_UNDERWRITE_URL, json=a2_payload)
+            a2_resp.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=e.response.status_code, detail=f"A2 underwrite failed: {e.response.text}")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=503, detail=f"A2 underwriting unavailable: {str(e)}")
 
-    # 3. Generate Hub HTML
+    canonical = map_a2_to_canonical(a2_resp.json())
+    
+    if not canonical.gate_pass:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "HUB_GATE_FAILURE",
+                "message": "A2 gate compliance check failed",
+                "tis": canonical.tis,
+                "gci": canonical.gci,
+                "clg": canonical.clg,
+                "decision": canonical.routing_band
+            }
+        )
+
     hub_id = str(uuid.uuid4())[:8]
     hub_path = f"{request.pilot_id}/{request.brand_id}/hub_{hub_id}.html"
-    html_content = generate_hub_html(request, canonical, hub_id)
+    html_content = generate_hub_html(request, canonical, hub_id, asset_score_result)
 
-    # 4. Upload to R2
     try:
         s3 = get_r2_client()
         s3.put_object(
             Bucket=os.getenv('R2_BUCKET_NAME'),
             Key=hub_path,
-            Body=html_content,
+            Body=html_content if isinstance(html_content, bytes) else str(html_content).encode('utf-8'),
             ContentType='text/html'
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"R2 upload failed: {str(e)}")
 
-    # 5. Construct URL
     base_url = os.getenv('HUB_BASE_URL', 'https://hubs.stardance.io')
     hub_url = f"{base_url}/{hub_path}"
 
@@ -198,23 +221,6 @@ async def hub_generate(request: HubGenerateRequest):
         clg=canonical.clg,
         routing_band=canonical.routing_band,
         gate_pass=canonical.gate_pass,
-        status="success"
+        status="success",
+        asset_scoring=asset_score_result
     )
-
-@router.get("/hub/health")
-async def hub_health():
-    """T5 health check with R2 status"""
-    try:
-        s3 = get_r2_client()
-        s3.head_bucket(Bucket=os.getenv('R2_BUCKET_NAME'))
-        r2_status = "connected"
-    except Exception as e:
-        r2_status = f"error: {str(e)}"
-    
-    return {
-        "status": "healthy",
-        "phase": "2.4",
-        "t5": "active",
-        "a2_integration": "external",
-        "r2_storage": r2_status
-    }
