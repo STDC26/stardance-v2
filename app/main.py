@@ -45,24 +45,25 @@ if __name__ == "__main__":
 
 @app.on_event("startup")
 async def run_migrations():
-    """Idempotent — safe to run on every startup. Retries for DB readiness."""
+    """Idempotent — safe to run on every startup. Uses asyncpg directly."""
     import os, asyncio
-    from sqlalchemy import create_engine, text
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
         logger.warning("DATABASE_URL not set — skipping migrations")
         return
+    # asyncpg requires postgresql:// not postgres://
+    asyncpg_url = database_url.replace("postgres://", "postgresql://").split("?")[0]
     for attempt in range(5):
         try:
-            engine = create_engine(database_url)
-            with engine.connect() as conn:
-                conn.execute(text("""
-                    ALTER TABLE calibrations 
-                      ADD COLUMN IF NOT EXISTS asset_id VARCHAR(255),
-                      ADD COLUMN IF NOT EXISTS asset_scoring_json JSONB,
-                      ADD COLUMN IF NOT EXISTS asset_scoring_version VARCHAR(50)
-                """))
-                conn.commit()
+            import asyncpg
+            conn = await asyncpg.connect(asyncpg_url)
+            await conn.execute("""
+                ALTER TABLE calibrations 
+                  ADD COLUMN IF NOT EXISTS asset_id VARCHAR(255),
+                  ADD COLUMN IF NOT EXISTS asset_scoring_json JSONB,
+                  ADD COLUMN IF NOT EXISTS asset_scoring_version VARCHAR(50)
+            """)
+            await conn.close()
             logger.info("✅ Migrations complete — asset scoring columns confirmed")
             return
         except Exception as e:
