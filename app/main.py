@@ -56,7 +56,7 @@ async def run_migrations():
     for attempt in range(5):
         try:
             import asyncpg
-            conn = await asyncpg.connect(asyncpg_url)
+            conn = await asyncpg.connect(asyncpg_url, ssl=False)
             await conn.execute("""
                 ALTER TABLE calibrations 
                   ADD COLUMN IF NOT EXISTS asset_id VARCHAR(255),
