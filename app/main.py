@@ -43,30 +43,3 @@ if __name__ == "__main__":
     logger.info(f"🚀 Starting server on {host}:{port}")
     uvicorn.run(app, host=host, port=port)
 
-@app.on_event("startup")
-async def run_migrations():
-    """Idempotent — safe to run on every startup. Uses asyncpg directly."""
-    import os, asyncio
-    database_url = os.environ.get("DATABASE_URL")
-    if not database_url:
-        logger.warning("DATABASE_URL not set — skipping migrations")
-        return
-    # asyncpg requires postgresql:// not postgres://
-    asyncpg_url = database_url.replace("postgres://", "postgresql://").split("?")[0]
-    for attempt in range(5):
-        try:
-            import asyncpg
-            conn = await asyncpg.connect(asyncpg_url, ssl=False)
-            await conn.execute("""
-                ALTER TABLE calibrations 
-                  ADD COLUMN IF NOT EXISTS asset_id VARCHAR(255),
-                  ADD COLUMN IF NOT EXISTS asset_scoring_json JSONB,
-                  ADD COLUMN IF NOT EXISTS asset_scoring_version VARCHAR(50)
-            """)
-            await conn.close()
-            logger.info("✅ Migrations complete — asset scoring columns confirmed")
-            return
-        except Exception as e:
-            logger.warning(f"Migration attempt {attempt+1}/5 failed: {e}")
-            await asyncio.sleep(3)
-    logger.error("❌ Migration failed after 5 attempts")
