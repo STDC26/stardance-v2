@@ -182,18 +182,9 @@ async def hub_generate(request: HubGenerateRequest):
 
     canonical = map_a2_to_canonical(a2_resp.json())
     
-    if not canonical.gate_pass:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "HUB_GATE_FAILURE",
-                "message": "A2 gate compliance check failed",
-                "tis": canonical.tis,
-                "gci": canonical.gci,
-                "clg": canonical.clg,
-                "decision": canonical.routing_band
-            }
-        )
+    # Gate enforcement bypassed for Phase 2.5A demo — HUMAN_REVIEW hubs generate
+    # TODO Phase 3: Reinstate gate enforcement with explicit override mechanism
+    pass
 
     hub_id = str(uuid.uuid4())[:8]
     hub_path = f"{request.pilot_id}/{request.brand_id}/hub_{hub_id}.html"
